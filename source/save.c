@@ -155,3 +155,26 @@ EWRAM_CODE void Save_Data_Check(void)
         return;
     }
 }
+
+int Save_Data_ValidateImage(const uint8_t *image, size_t image_size)
+{
+    if ((image == NULL) || (image_size < sizeof(save_data)))
+        return 0;
+
+    for (size_t i = 0; i < MAGIC_STRING_LEN; i++)
+    {
+        if (image[i] != (uint8_t)MAGIC_STRING[i])
+            return 0;
+    }
+
+    uint32_t stored_checksum = (uint32_t)image[4] |
+                              ((uint32_t)image[5] << 8) |
+                              ((uint32_t)image[6] << 16) |
+                              ((uint32_t)image[7] << 24);
+    size_t offset = offsetof(save_data, checksum) + sizeof(((save_data *)0)->checksum);
+    uint32_t calculated_checksum = 0;
+    for (size_t i = offset; i < sizeof(save_data); i++)
+        calculated_checksum += image[i];
+
+    return stored_checksum == calculated_checksum;
+}

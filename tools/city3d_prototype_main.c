@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include <math.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
@@ -12,6 +15,7 @@
 #include "renderer3d/city_renderer.h"
 #include "room_game/room_game.h"
 #include "room_scenarios/room_scenarios.h"
+#include "save.h"
 #include "simulation/common.h"
 
 static void set_window_title(SDL_Window *window, int simulation_running)
@@ -23,10 +27,121 @@ static void set_window_title(SDL_Window *window, int simulation_running)
     SDL_SetWindowTitle(window, title);
 }
 
+static int load_save_file(const char *path, int requested_slot, int *loaded_slot)
+{
+    FILE *file = fopen(path, "rb");
+    if (file == NULL)
+    {
+        fprintf(stderr, "Couldn't open the requested save file.\n");
+        return 0;
+    }
+
+    if ((fseek(file, 0, SEEK_END) != 0) || (ftell(file) < 0))
+    {
+        fclose(file);
+        fprintf(stderr, "Couldn't read the save file size.\n");
+        return 0;
+    }
+    long length = ftell(file);
+    if ((length < (long)sizeof(save_data)) || (length > MEM_SRAM_SIZE) ||
+        (fseek(file, 0, SEEK_SET) != 0))
+    {
+        fclose(file);
+        fprintf(stderr, "Save file size is outside the supported SRAM range.\n");
+        return 0;
+    }
+
+    size_t image_size = (size_t)length;
+    uint8_t *image = malloc(image_size);
+    if ((image == NULL) || (fread(image, 1, image_size, file) != image_size))
+    {
+        free(image);
+        fclose(file);
+        fprintf(stderr, "Couldn't read the complete save file.\n");
+        return 0;
+    }
+    fclose(file);
+
+    if (!Save_Data_ValidateImage(image, image_size))
+    {
+        free(image);
+        fprintf(stderr, "Save file header or checksum is invalid.\n");
+        return 0;
+    }
+
+    const save_data *header = (const save_data *)image;
+    int slot = requested_slot;
+    if (slot < 0)
+    {
+        for (slot = 0; slot < 4; slot++)
+        {
+            if (header->city[slot].name[0] != '\0')
+                break;
+        }
+    }
+    if ((slot < 0) || (slot >= 4) || (header->city[slot].name[0] == '\0'))
+    {
+        free(image);
+        fprintf(stderr, "Requested save slot is empty or out of range.\n");
+        return 0;
+    }
+
+    memset(MEM_SRAM, 0, MEM_SRAM_SIZE);
+    memcpy(MEM_SRAM, image, image_size);
+
+    uint32_t fast_seed = ((uint32_t)header->rand_fast_seed[3] << 24) |
+                         ((uint32_t)header->rand_fast_seed[2] << 16) |
+                         ((uint32_t)header->rand_fast_seed[1] << 8) |
+                         ((uint32_t)header->rand_fast_seed[0]);
+    rand_fast_set_seed(fast_seed);
+    Room_Game_SetAnimationsEnabled(header->animations_enabled);
+    Room_Game_Graphics_New_Set(header->new_graphics);
+    Simulation_DisastersSetEnabled(header->disasters_enabled);
+    free(image);
+
+    if (!Room_Game_City_Load(slot))
+    {
+        fprintf(stderr, "Couldn't load the requested city slot.\n");
+        return 0;
+    }
+    Room_Game_Set_Initial_Load_State();
+    *loaded_slot = slot;
+    return 1;
+}
+
+static int parse_options(int argc, char **argv, const char **save_path,
+                         int *save_slot)
+{
+    *save_path = NULL;
+    *save_slot = -1;
+    for (int i = 1; i < argc; i++)
+    {
+        if ((strcmp(argv[i], "--save") == 0) && (i + 1 < argc))
+            *save_path = argv[++i];
+        else if ((strcmp(argv[i], "--slot") == 0) && (i + 1 < argc))
+        {
+            char *end = NULL;
+            long slot = strtol(argv[++i], &end, 10);
+            if ((end == argv[i]) || (*end != '\0') || (slot < 0) || (slot > 3))
+                return 0;
+            *save_slot = (int)slot;
+        }
+        else
+            return 0;
+    }
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
+    const char *save_path;
+    int save_slot;
+    if (!parse_options(argc, argv, &save_path, &save_slot) ||
+        ((save_path == NULL) && (save_slot >= 0)))
+    {
+        fprintf(stderr, "Usage: ucity-3d-prototype [--save FILE [--slot 0-3]]\n");
+        return 2;
+    }
 
     UGBA_InitHeadless(NULL, NULL);
     rand_fast_set_seed(0x12345678);
@@ -65,7 +180,18 @@ int main(int argc, char **argv)
     SDL_GL_SetSwapInterval(1);
     glClearColor(0.69f, 0.80f, 0.86f, 1.0f);
     int selected_scenario = 4;
-    Room_Scenarios_LoadCity(selected_scenario);
+    int loaded_slot = -1;
+    if (save_path != NULL)
+    {
+        if (!load_save_file(save_path, save_slot, &loaded_slot))
+        {
+            SDL_GL_DeleteContext(context);
+            SDL_DestroyWindow(window);
+            return 1;
+        }
+    }
+    else
+        Room_Scenarios_LoadCity(selected_scenario);
     set_window_title(window, 0);
 
     float yaw = 35.0f;
@@ -94,7 +220,7 @@ int main(int argc, char **argv)
             }
             else if ((event.type == SDL_KEYDOWN) &&
                      (event.key.keysym.sym >= SDLK_1) &&
-                     (event.key.keysym.sym <= SDLK_6))
+                     (event.key.keysym.sym <= SDLK_6) && (save_path == NULL))
             {
                 selected_scenario = event.key.keysym.sym - SDLK_1;
                 Room_Scenarios_LoadCity(selected_scenario);

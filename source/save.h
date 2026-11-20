@@ -6,6 +6,7 @@
 #define SAVE_H__
 
 #include <assert.h>
+#include <stddef.h>
 
 #include <ugba/ugba.h>
 
@@ -90,5 +91,8 @@ void Save_Data_Reset_City(int index);
 void Save_Data_Reset(void);
 
 void Save_Data_Check(void);
+
+// Validates a raw SRAM image without modifying memory or the image.
+int Save_Data_ValidateImage(const uint8_t *image, size_t image_size);
 
 #endif // SAVE_H__
