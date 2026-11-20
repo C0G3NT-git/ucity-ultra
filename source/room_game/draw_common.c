@@ -155,6 +155,7 @@ void CityMapDrawTile(uint16_t tile, int x, int y)
     uint16_t vram_info = City_Tileset_VRAM_Info(tile);
     write_tile_sbb(vram_info, map, x, y);
     CityView_SetLegacyTile(x, y, tile);
+    CityView_SetLegacyFlipFlags(x, y, 0);
 }
 
 void CityMapDrawTilePreserveFlip(uint16_t tile, int x, int y)
@@ -172,18 +173,25 @@ void CityMapDrawTilePreserveFlip(uint16_t tile, int x, int y)
 
     *ptr = (*ptr & mask) | vram_info;
     CityView_SetLegacyTile(x, y, tile);
+    CityView_SetLegacyFlipFlags(x, y,
+        (uint8_t)(((*ptr & MAP_REGULAR_HFLIP) ? 1 : 0) |
+                  ((*ptr & MAP_REGULAR_VFLIP) ? 2 : 0)));
 }
 
 void CityMapToggleHFlip(int x, int y)
 {
     void *map = (void *)CITY_MAP_BASE;
     toggle_hflip_tile_sbb(map, x, y);
+    CityView_SetLegacyFlipFlags(x, y,
+        (uint8_t)((CityView_GetLegacyFlipFlags(x, y) ^ 1)));
 }
 
 void CityMapToggleVFlip(int x, int y)
 {
     void *map = (void *)CITY_MAP_BASE;
     toggle_vflip_tile_sbb(map, x, y);
+    CityView_SetLegacyFlipFlags(x, y,
+        (uint8_t)((CityView_GetLegacyFlipFlags(x, y) ^ 2)));
 }
 
 // Checks if a bridge of a certain type can be built. For that to be possible,

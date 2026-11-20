@@ -45,9 +45,20 @@ enum {
     CITY_VIEW_NETWORK_POWER = 1 << 2,
 };
 
+// Direction bits for the three network masks returned on each cell.
+enum {
+    CITY_VIEW_DIR_NORTH = 1 << 0,
+    CITY_VIEW_DIR_EAST  = 1 << 1,
+    CITY_VIEW_DIR_SOUTH = 1 << 2,
+    CITY_VIEW_DIR_WEST  = 1 << 3,
+};
+
 typedef struct {
     city_view_kind kind;
     uint8_t networks;
+    uint8_t road_connections;
+    uint8_t rail_connections;
+    uint8_t power_connections;
 
     // Temporary migration/debug field. New rendering code should use kind and
     // networks; this ID exists to diagnose legacy conversion discrepancies.
@@ -74,5 +85,7 @@ int CityView_ImportLegacyMap(const uint16_t *legacy_tiles);
 // model data only; renderer synchronization remains the draw layer's job.
 uint16_t CityView_GetLegacyTile(int x, int y);
 void CityView_SetLegacyTile(int x, int y, uint16_t tile_id);
+void CityView_SetLegacyFlipFlags(int x, int y, uint8_t flags);
+uint8_t CityView_GetLegacyFlipFlags(int x, int y);
 
 #endif // CITY_MODEL_CITY_VIEW_H__
