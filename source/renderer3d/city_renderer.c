@@ -99,6 +99,77 @@ static void draw_tree(int x, int z)
     glEnd();
 }
 
+static void rotate_x(float angle, float *x, float *y, float *z)
+{
+    float c = cosf(angle);
+    float s = sinf(angle);
+    float old_y = *y;
+    float old_z = *z;
+    *y = c * old_y - s * old_z;
+    *z = s * old_y + c * old_z;
+    (void)x;
+}
+
+static void rotate_y(float angle, float *x, float *y, float *z)
+{
+    float c = cosf(angle);
+    float s = sinf(angle);
+    float old_x = *x;
+    float old_z = *z;
+    *x = c * old_x + s * old_z;
+    *z = -s * old_x + c * old_z;
+    (void)y;
+}
+
+static void camera_to_world(float *x, float *y, float *z,
+                            float yaw, float pitch)
+{
+    const float degrees_to_radians = 0.01745329252f;
+    rotate_x(-pitch * degrees_to_radians, x, y, z);
+    rotate_y(-yaw * degrees_to_radians, x, y, z);
+}
+
+int CityRenderer3D_PickCell(int screen_x, int screen_y, int width, int height,
+                            float yaw, float pitch, float distance,
+                            int *out_x, int *out_y)
+{
+    if ((width <= 0) || (height <= 0) || (screen_x < 0) ||
+        (screen_x >= width) || (screen_y < 0) || (screen_y >= height) ||
+        (out_x == 0) || (out_y == 0))
+        return 0;
+
+    float aspect = (float)width / (float)height;
+    float ndc_x = 2.0f * (float)screen_x / (float)width - 1.0f;
+    float ndc_y = 1.0f - 2.0f * (float)screen_y / (float)height;
+    float ray_x = ndc_x * 0.42f * aspect;
+    float ray_y = ndc_y * 0.42f;
+    float ray_z = -1.0f;
+
+    float origin_x = 0.0f, origin_y = 0.0f, origin_z = distance;
+    camera_to_world(&origin_x, &origin_y, &origin_z, yaw, pitch);
+    origin_x += CITY_VIEW_WIDTH / 2.0f;
+    origin_z += CITY_VIEW_HEIGHT / 2.0f;
+    camera_to_world(&ray_x, &ray_y, &ray_z, yaw, pitch);
+
+    if (ray_y >= 0.0f)
+        return 0;
+    float t = -origin_y / ray_y;
+    if (t < 0.0f)
+        return 0;
+
+    float world_x = origin_x + ray_x * t;
+    float world_z = origin_z + ray_z * t;
+    int cell_x = (int)floorf(world_x);
+    int cell_y = (int)floorf(world_z);
+    if ((cell_x < 0) || (cell_x >= CITY_VIEW_WIDTH) ||
+        (cell_y < 0) || (cell_y >= CITY_VIEW_HEIGHT))
+        return 0;
+
+    *out_x = cell_x;
+    *out_y = cell_y;
+    return 1;
+}
+
 static void draw_building(const city_view_cell *cell, int cell_x, int cell_z)
 {
     if ((cell->footprint_origin_x < 0) || (cell->footprint_origin_y < 0) ||
@@ -146,8 +217,45 @@ static void draw_building(const city_view_cell *cell, int cell_x, int cell_z)
     }
 }
 
+static void draw_selection(const city_view_cell *cell, int x, int z)
+{
+    float x0 = (float)cell->footprint_origin_x;
+    float z0 = (float)cell->footprint_origin_y;
+    float x1 = x0 + cell->footprint_width;
+    float z1 = z0 + cell->footprint_height;
+    float y = 0.08f;
+
+    if ((cell->footprint_origin_x < 0) || (cell->footprint_origin_y < 0))
+    {
+        x0 = (float)x;
+        z0 = (float)z;
+        x1 = x0 + 1.0f;
+        z1 = z0 + 1.0f;
+    }
+    if ((cell->kind >= CITY_VIEW_RESIDENTIAL) &&
+        (cell->kind <= CITY_VIEW_POWER_PLANT))
+    {
+        int ox = cell->footprint_origin_x;
+        int oz = cell->footprint_origin_y;
+        y = 1.0f + (float)((cell->kind * 7 + ox * 3 + oz) % 7) * 0.34f;
+        if (cell->kind == CITY_VIEW_POWER_PLANT)
+            y += 1.2f;
+        y += 0.04f;
+    }
+
+    glLineWidth(2.5f);
+    color(1.0f, 0.88f, 0.22f);
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(x0, y, z0);
+    glVertex3f(x1, y, z0);
+    glVertex3f(x1, y, z1);
+    glVertex3f(x0, y, z1);
+    glEnd();
+    glLineWidth(1.0f);
+}
+
 void CityRenderer3D_Draw(int width, int height, float yaw, float pitch,
-                         float distance)
+                         float distance, int selected_x, int selected_y)
 {
     if ((width <= 0) || (height <= 0))
         return;
@@ -203,5 +311,13 @@ void CityRenderer3D_Draw(int width, int height, float yaw, float pitch,
                 draw_network_path((float)x, (float)z, cell->power_connections,
                                   0.035f, 0.13f, 0.88f, 0.76f, 0.24f);
         }
+    }
+
+    if ((selected_x >= 0) && (selected_x < CITY_VIEW_WIDTH) &&
+        (selected_y >= 0) && (selected_y < CITY_VIEW_HEIGHT))
+    {
+        const city_view_cell *selected =
+            &cells[selected_y * CITY_VIEW_WIDTH + selected_x];
+        draw_selection(selected, selected_x, selected_y);
     }
 }

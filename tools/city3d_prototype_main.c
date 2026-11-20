@@ -11,6 +11,7 @@
 #include <SDL2/SDL_opengl.h>
 #include <ugba/ugba.h>
 
+#include "city_model/city_view.h"
 #include "random.h"
 #include "renderer3d/city_renderer.h"
 #include "room_game/room_game.h"
@@ -18,13 +19,53 @@
 #include "save.h"
 #include "simulation/common.h"
 
-static void set_window_title(SDL_Window *window, int simulation_running)
+static void set_window_title(SDL_Window *window, int simulation_running,
+                             int selected_x, int selected_y)
 {
     char title[128];
-    snprintf(title, sizeof(title), "µCity Advance 3D — %s | %s | 1–6 scenarios",
-             Room_Game_Get_City_Name(),
-             simulation_running ? "simulation running" : "Space: run simulation");
+    if ((selected_x >= 0) && (selected_y >= 0))
+    {
+        static const char *kind_names[] = {
+            "Field", "Forest", "Water", "Residential", "Industrial",
+            "Commercial", "Police", "Fire station", "Hospital", "Park",
+            "Stadium", "School", "High school", "University", "Museum",
+            "Library", "Airport", "Port", "Dock", "Power plant", "Fire",
+            "Radiation"
+        };
+        city_view_cell cell;
+        if (CityView_ReadCell(selected_x, selected_y, &cell))
+        {
+            snprintf(title, sizeof(title), "µCity 3D — %s | %s | %s (%d,%d) %dx%d",
+                     Room_Game_Get_City_Name(),
+                     simulation_running ? "Running" : "Paused",
+                     kind_names[cell.kind], selected_x, selected_y,
+                     cell.footprint_width, cell.footprint_height);
+        }
+    }
+    else
+    {
+        snprintf(title, sizeof(title), "µCity Advance 3D — %s | %s | 1–6 scenarios",
+                 Room_Game_Get_City_Name(),
+                 simulation_running ? "Space: pause" : "Space: run simulation");
+    }
     SDL_SetWindowTitle(window, title);
+}
+
+static int pick_window_cell(SDL_Window *window, int mouse_x, int mouse_y,
+                            float yaw, float pitch, float distance,
+                            int *cell_x, int *cell_y)
+{
+    int window_width, window_height;
+    int drawable_width, drawable_height;
+    SDL_GetWindowSize(window, &window_width, &window_height);
+    SDL_GL_GetDrawableSize(window, &drawable_width, &drawable_height);
+    if ((window_width <= 0) || (window_height <= 0))
+        return 0;
+
+    int x = mouse_x * drawable_width / window_width;
+    int y = mouse_y * drawable_height / window_height;
+    return CityRenderer3D_PickCell(x, y, drawable_width, drawable_height,
+                                   yaw, pitch, distance, cell_x, cell_y);
 }
 
 static int load_save_file(const char *path, int requested_slot, int *loaded_slot)
@@ -192,7 +233,9 @@ int main(int argc, char **argv)
     }
     else
         Room_Scenarios_LoadCity(selected_scenario);
-    set_window_title(window, 0);
+    int selected_x = -1;
+    int selected_y = -1;
+    set_window_title(window, 0, selected_x, selected_y);
 
     float yaw = 35.0f;
     float pitch = 50.0f;
@@ -225,18 +268,31 @@ int main(int argc, char **argv)
                 selected_scenario = event.key.keysym.sym - SDLK_1;
                 Room_Scenarios_LoadCity(selected_scenario);
                 simulation_running = 0;
-                set_window_title(window, simulation_running);
+                selected_x = -1;
+                selected_y = -1;
+                set_window_title(window, simulation_running, selected_x, selected_y);
             }
             else if ((event.type == SDL_KEYDOWN) &&
                      (event.key.keysym.sym == SDLK_SPACE))
             {
                 simulation_running = !simulation_running;
                 next_simulation_step = SDL_GetTicks() + 750;
-                set_window_title(window, simulation_running);
+                set_window_title(window, simulation_running, selected_x, selected_y);
             }
             else if ((event.type == SDL_MOUSEBUTTONDOWN) &&
                      (event.button.button == SDL_BUTTON_LEFT))
+            {
                 dragging = 1;
+                int cell_x, cell_y;
+                if (pick_window_cell(window, event.button.x, event.button.y,
+                                     yaw, pitch, distance, &cell_x, &cell_y))
+                {
+                    selected_x = cell_x;
+                    selected_y = cell_y;
+                    set_window_title(window, simulation_running,
+                                     selected_x, selected_y);
+                }
+            }
             else if ((event.type == SDL_MOUSEBUTTONUP) &&
                      (event.button.button == SDL_BUTTON_LEFT))
                 dragging = 0;
@@ -246,6 +302,9 @@ int main(int argc, char **argv)
                 pitch += event.motion.yrel * 0.35f;
                 if (pitch < 20.0f) pitch = 20.0f;
                 if (pitch > 78.0f) pitch = 78.0f;
+                if (selected_x >= 0)
+                    set_window_title(window, simulation_running,
+                                     selected_x, selected_y);
             }
             else if (event.type == SDL_MOUSEWHEEL)
             {
@@ -264,7 +323,8 @@ int main(int argc, char **argv)
 
         int width, height;
         SDL_GL_GetDrawableSize(window, &width, &height);
-        CityRenderer3D_Draw(width, height, yaw, pitch, distance);
+        CityRenderer3D_Draw(width, height, yaw, pitch, distance,
+                            selected_x, selected_y);
         SDL_GL_SwapWindow(window);
     }
 

@@ -116,6 +116,8 @@ The order below keeps the current game playable while reducing the risk of mixin
 
 ### Phase 5 — Build the 3D city renderer in visual layers
 
+**Progress:** the prototype renders terrain, low-poly tree and building placeholders, and network overlays from semantic connection masks. It supports orbit, zoom, and screen-to-grid picking; the selected cell is outlined, buildings highlight their full footprint, and the window title shows the selected cell kind and dimensions. Build/demolish interaction, terrain height, picking feedback for invalid cells, and optimized mesh batching remain future work.
+
 **Tasks**
 
 1. Render terrain as a grid mesh with terrain materials and water; add terrain height only if selected in Phase 0.
