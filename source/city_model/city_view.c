@@ -5,6 +5,7 @@
 #include "city_model/city_view.h"
 
 #include "map_utils.h"
+#include "room_game/building_info.h"
 #include "room_game/room_game.h"
 #include "room_game/tileset_info.h"
 
@@ -161,6 +162,26 @@ int CityView_ReadCell(int x, int y, city_view_cell *out_cell)
 
     out_cell->footprint_origin_x = x + info->base_x_delta;
     out_cell->footprint_origin_y = y + info->base_y_delta;
+    out_cell->footprint_width = 1;
+    out_cell->footprint_height = 1;
+
+    if ((type & TYPE_MASK) >= TYPE_RESIDENTIAL &&
+        (type & TYPE_MASK) <= TYPE_RADIATION)
+    {
+        int ox = out_cell->footprint_origin_x;
+        int oy = out_cell->footprint_origin_y;
+        if ((ox >= 0) && (ox < CITY_VIEW_WIDTH) &&
+            (oy >= 0) && (oy < CITY_VIEW_HEIGHT))
+        {
+            uint16_t base_tile = CityView_GetLegacyTile(ox, oy);
+            const building_info *building = Get_BuildingFromBaseTile(base_tile);
+            if ((building->width > 0) && (building->height > 0))
+            {
+                out_cell->footprint_width = (uint8_t)building->width;
+                out_cell->footprint_height = (uint8_t)building->height;
+            }
+        }
+    }
     return 1;
 }
 

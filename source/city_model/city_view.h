@@ -68,6 +68,9 @@ typedef struct {
     // For cells whose type is not a building, this is the cell coordinate.
     int16_t footprint_origin_x;
     int16_t footprint_origin_y;
+    // Legacy-authored footprint size. Non-building cells are 1 × 1.
+    uint8_t footprint_width;
+    uint8_t footprint_height;
 } city_view_cell;
 
 // Returns 1 and fills out_cell for an in-bounds cell; returns 0 otherwise.
