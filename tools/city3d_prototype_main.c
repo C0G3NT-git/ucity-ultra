@@ -8,35 +8,19 @@
 #include <SDL2/SDL_opengl.h>
 #include <ugba/ugba.h>
 
-#include "city_model/city_view.h"
-#include "maps/city/scenario_0_rock_river_bin.h"
-#include "maps/city/scenario_1_boringtown_bin.h"
-#include "maps/city/scenario_2_portville_bin.h"
-#include "maps/city/scenario_3_newdale_bin.h"
-#include "maps/city/scenario_4_central_bin.h"
-#include "maps/city/scenario_5_futura_bin.h"
+#include "random.h"
 #include "renderer3d/city_renderer.h"
+#include "room_game/room_game.h"
+#include "room_scenarios/room_scenarios.h"
+#include "simulation/common.h"
 
-static const char *scenario_names[] = {
-    "Rock River", "Boringtown", "Portville", "Newdale", "Central", "Futura"
-};
-static const uint8_t *scenario_maps[] = {
-    scenario_0_rock_river_bin,
-    scenario_1_boringtown_bin,
-    scenario_2_portville_bin,
-    scenario_3_newdale_bin,
-    scenario_4_central_bin,
-    scenario_5_futura_bin,
-};
-
-static uint16_t scenario_map[CITY_VIEW_CELL_COUNT];
-
-static void load_scenario(int index)
+static void set_window_title(SDL_Window *window, int simulation_running)
 {
-    const uint8_t *source = scenario_maps[index];
-    for (int i = 0; i < CITY_VIEW_CELL_COUNT; i++)
-        scenario_map[i] = source[i * 2] | ((uint16_t)source[i * 2 + 1] << 8);
-    CityView_ImportLegacyMap(scenario_map);
+    char title[128];
+    snprintf(title, sizeof(title), "µCity Advance 3D — %s | %s | 1–6 scenarios",
+             Room_Game_Get_City_Name(),
+             simulation_running ? "simulation running" : "Space: run simulation");
+    SDL_SetWindowTitle(window, title);
 }
 
 int main(int argc, char **argv)
@@ -45,6 +29,10 @@ int main(int argc, char **argv)
     (void)argv;
 
     UGBA_InitHeadless(NULL, NULL);
+    rand_fast_set_seed(0x12345678);
+    Room_Game_SetAnimationsEnabled(0);
+    Room_Game_Graphics_New_Set(1);
+    Simulation_DisastersSetEnabled(0);
     if (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0)
     {
         fprintf(stderr, "SDL video initialization failed: %s\n", SDL_GetError());
@@ -77,14 +65,16 @@ int main(int argc, char **argv)
     SDL_GL_SetSwapInterval(1);
     glClearColor(0.69f, 0.80f, 0.86f, 1.0f);
     int selected_scenario = 4;
-    load_scenario(selected_scenario);
-    SDL_SetWindowTitle(window, "µCity Advance 3D — Central (1–6: select scenario)");
+    Room_Scenarios_LoadCity(selected_scenario);
+    set_window_title(window, 0);
 
     float yaw = 35.0f;
     float pitch = 50.0f;
     float distance = 100.0f;
     int dragging = 0;
     int running = 1;
+    int simulation_running = 0;
+    uint32_t next_simulation_step = SDL_GetTicks() + 750;
     while (running)
     {
         SDL_Event event;
@@ -107,12 +97,16 @@ int main(int argc, char **argv)
                      (event.key.keysym.sym <= SDLK_6))
             {
                 selected_scenario = event.key.keysym.sym - SDLK_1;
-                load_scenario(selected_scenario);
-                char title[96];
-                snprintf(title, sizeof(title),
-                         "µCity Advance 3D — %s (1–6: select scenario)",
-                         scenario_names[selected_scenario]);
-                SDL_SetWindowTitle(window, title);
+                Room_Scenarios_LoadCity(selected_scenario);
+                simulation_running = 0;
+                set_window_title(window, simulation_running);
+            }
+            else if ((event.type == SDL_KEYDOWN) &&
+                     (event.key.keysym.sym == SDLK_SPACE))
+            {
+                simulation_running = !simulation_running;
+                next_simulation_step = SDL_GetTicks() + 750;
+                set_window_title(window, simulation_running);
             }
             else if ((event.type == SDL_MOUSEBUTTONDOWN) &&
                      (event.button.button == SDL_BUTTON_LEFT))
@@ -133,6 +127,13 @@ int main(int argc, char **argv)
                 if (distance < 34.0f) distance = 34.0f;
                 if (distance > 180.0f) distance = 180.0f;
             }
+        }
+
+        uint32_t now = SDL_GetTicks();
+        if (simulation_running && ((int32_t)(now - next_simulation_step) >= 0))
+        {
+            Simulation_SimulateAll();
+            next_simulation_step = now + 750;
         }
 
         int width, height;

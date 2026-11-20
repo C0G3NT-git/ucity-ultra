@@ -468,6 +468,32 @@ void Room_Scenarios_Unload(void)
     Game_Clear_Screen();
 }
 
+int Room_Scenarios_LoadCity(int scenario_index)
+{
+    if ((scenario_index < SCENARIO_MIN) || (scenario_index > SCENARIO_MAX))
+        return 0;
+
+    const scenario_info *s = &scenarios[scenario_index];
+
+    Room_Game_Load_City(s->map, s->name, s->start_scroll_x, s->start_scroll_y);
+    Room_Game_Set_City_Date(s->start_month, s->start_year);
+    Simulation_SetCityClass(s->city_type);
+    Room_Game_Set_City_Economy(s->start_funds, s->tax_percentage,
+                               s->payments_left, s->amount_per_payment);
+    Technology_SetLevel(s->technology_level);
+    for (int i = 0; i < MAX_PERMANENT_MSGS_TO_DISABLE; i++)
+    {
+        int id = s->permanent_msgs_to_disable[i];
+        if (id != 0)
+            PersistentMessageFlagAsShown(id);
+    }
+    Simulation_NegativeBudgetCountSet(0);
+    Simulation_GraphsResetAll();
+    Room_Game_Set_Initial_Load_State();
+    rand_slow_set_seed(rand_fast()); // Generate a new seed
+    return 1;
+}
+
 void Room_Scenarios_Handle(void)
 {
     uint16_t keys_pressed = KEYS_Pressed();
@@ -481,25 +507,8 @@ void Room_Scenarios_Handle(void)
 
     if (keys_pressed & KEY_A)
     {
-        const scenario_info *s = &scenarios[selected_scenario];
-
-        // Setup initial game state
-        Room_Game_Load_City(s->map, s->name, s->start_scroll_x, s->start_scroll_y);
-        Room_Game_Set_City_Date(s->start_month, s->start_year);
-        Simulation_SetCityClass(s->city_type);
-        Room_Game_Set_City_Economy(s->start_funds, s->tax_percentage,
-                                   s->payments_left, s->amount_per_payment);
-        Technology_SetLevel(s->technology_level);
-        for (int i = 0; i < MAX_PERMANENT_MSGS_TO_DISABLE; i++)
-        {
-            int id = s->permanent_msgs_to_disable[i];
-            if (id != 0)
-                PersistentMessageFlagAsShown(id);
-        }
-        Simulation_NegativeBudgetCountSet(0);
-        Simulation_GraphsResetAll();
-        Room_Game_Set_Initial_Load_State();
-        rand_slow_set_seed(rand_fast()); // Generate a new seed
+        if (!Room_Scenarios_LoadCity(selected_scenario))
+            return;
         Game_Room_Prepare_Switch(ROOM_GAME);
         return;
     }
