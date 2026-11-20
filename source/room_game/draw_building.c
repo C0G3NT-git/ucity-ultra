@@ -10,6 +10,7 @@
 #include "map_utils.h"
 #include "money.h"
 #include "sfx.h"
+#include "city_model/city_commands.h"
 #include "room_game/building_info.h"
 #include "room_game/draw_common.h"
 #include "room_game/draw_port.h"
@@ -237,13 +238,13 @@ void Building_Remove(int force, int x, int y)
 
     if ((type & (TYPE_HAS_ROAD | TYPE_HAS_TRAIN | TYPE_HAS_POWER)) != 0)
     {
-        BuildingRemoveRoadTrainPowerLines(force, x, y);
+        CityCommand_RemoveNetworkAtCell(x, y, force);
         return;
     }
 
     if ((type & TYPE_MASK) == TYPE_PORT)
     {
-        MapDeletePort(force, x, y);
+        CityCommand_DemolishPort(x, y, force);
         return;
     }
 
@@ -273,7 +274,7 @@ void Building_Remove(int force, int x, int y)
         (type == TYPE_AIRPORT) || (type == TYPE_PARK) ||
         (type == TYPE_POWER_PLANT))
     {
-        MapDeleteBuilding(force, x, y);
+        CityCommand_Demolish(x, y, force);
         return;
     }
 
@@ -302,7 +303,7 @@ void Building_Build(int force, int type, int x, int y)
         // Regular building
         // ----------------
 
-        MapDrawBuilding(force, type, x, y);
+        CityCommand_BuildFromLegacyType(type, x, y, force);
 
         return;
     }
@@ -317,22 +318,22 @@ void Building_Build(int force, int type, int x, int y)
     }
     else if (type == B_Road)
     {
-        MapDrawRoad(force, x, y);
+        CityCommand_PlaceNetwork(CITY_NETWORK_ROAD, x, y, force);
         return;
     }
     else if (type == B_Train)
     {
-        MapDrawTrain(force, x, y);
+        CityCommand_PlaceNetwork(CITY_NETWORK_RAIL, x, y, force);
         return;
     }
     else if (type == B_PowerLines)
     {
-        MapDrawPowerLines(force, x, y);
+        CityCommand_PlaceNetwork(CITY_NETWORK_POWER, x, y, force);
         return;
     }
     else if (type == B_Port)
     {
-        MapDrawPort(force, x, y);
+        CityCommand_BuildPort(x, y, force);
         return;
     }
 

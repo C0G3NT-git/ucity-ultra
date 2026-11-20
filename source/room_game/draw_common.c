@@ -6,6 +6,7 @@
 
 #include <ugba/ugba.h>
 
+#include "city_model/city_view.h"
 #include "map_utils.h"
 #include "money.h"
 #include "sfx.h"
@@ -27,8 +28,7 @@
 
 uint16_t CityMapGetTypeNoBoundCheck(int x, int y)
 {
-    void *map = (void *)CITY_MAP_BASE;
-    uint16_t tile = MAP_REGULAR_TILE(read_tile_sbb(map, x, y));
+    uint16_t tile = CityView_GetLegacyTile(x, y);
     const city_tile_info *tile_info = City_Tileset_Entry_Info(tile);
     return tile_info->element_type;
 }
@@ -66,16 +66,14 @@ uint16_t CityMapGetType(int x, int y)
         return TYPE_FIELD;
     }
 
-    void *map = (void *)CITY_MAP_BASE;
-    uint16_t tile = MAP_REGULAR_TILE(read_tile_sbb(map, x, y));
+    uint16_t tile = CityView_GetLegacyTile(x, y);
     const city_tile_info *tile_info = City_Tileset_Entry_Info(tile);
     return tile_info->element_type;
 }
 
 uint16_t CityMapGetTile(int x, int y)
 {
-    void *map = (void *)CITY_MAP_BASE;
-    return MAP_REGULAR_TILE(read_tile_sbb(map, x, y));
+    return CityView_GetLegacyTile(x, y);
 }
 
 uint16_t CityMapGetTileClamped(int x, int y)
@@ -90,14 +88,12 @@ uint16_t CityMapGetTileClamped(int x, int y)
     else if (y > (CITY_MAP_HEIGHT - 1))
         y = CITY_MAP_HEIGHT - 1;
 
-    void *map = (void *)CITY_MAP_BASE;
-    return MAP_REGULAR_TILE(read_tile_sbb(map, x, y));
+    return CityView_GetLegacyTile(x, y);
 }
 
 void CityMapGetTypeAndTileUnsafe(int x, int y, uint16_t *tile, uint16_t *type)
 {
-    void *map = (void *)CITY_MAP_BASE;
-    *tile = MAP_REGULAR_TILE(read_tile_sbb(map, x, y));
+    *tile = CityView_GetLegacyTile(x, y);
     const city_tile_info *tile_info = City_Tileset_Entry_Info(*tile);
     *type = tile_info->element_type;
 }
@@ -151,13 +147,22 @@ void CityMapGetTypeAndTile(int x, int y, uint16_t *tile, uint16_t *type)
 
 void CityMapDrawTile(uint16_t tile, int x, int y)
 {
+    if ((x < 0) || (x >= CITY_MAP_WIDTH) ||
+        (y < 0) || (y >= CITY_MAP_HEIGHT))
+        return;
+
     void *map = (void *)CITY_MAP_BASE;
     uint16_t vram_info = City_Tileset_VRAM_Info(tile);
     write_tile_sbb(vram_info, map, x, y);
+    CityView_SetLegacyTile(x, y, tile);
 }
 
 void CityMapDrawTilePreserveFlip(uint16_t tile, int x, int y)
 {
+    if ((x < 0) || (x >= CITY_MAP_WIDTH) ||
+        (y < 0) || (y >= CITY_MAP_HEIGHT))
+        return;
+
     void *map = (void *)CITY_MAP_BASE;
     uint16_t *ptr = get_pointer_sbb(map, x, y);
 
@@ -166,6 +171,7 @@ void CityMapDrawTilePreserveFlip(uint16_t tile, int x, int y)
     uint16_t mask = MAP_REGULAR_HFLIP | MAP_REGULAR_VFLIP;
 
     *ptr = (*ptr & mask) | vram_info;
+    CityView_SetLegacyTile(x, y, tile);
 }
 
 void CityMapToggleHFlip(int x, int y)

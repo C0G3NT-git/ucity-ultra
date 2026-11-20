@@ -8,9 +8,8 @@
 
 #include <ugba/ugba.h>
 
+#include "city_model/city_commands.h"
 #include "random.h"
-#include "room_game/building_info.h"
-#include "room_game/draw_building.h"
 #include "room_game/draw_common.h"
 #include "room_game/room_game.h"
 #include "room_game/tileset_info.h"
@@ -375,7 +374,6 @@ IWRAM_CODE static int PositionTest(int x, int y, uint16_t ref_type,
 // Try to build a building as big as possible.
 IWRAM_CODE void Simulation_CreateBuildingsTryBuild(int x, int y, uint16_t type)
 {
-    int building_result;
     int size;
 
     // The tiles to test are arranged like this (0 is the origin):
@@ -449,24 +447,6 @@ IWRAM_CODE void Simulation_CreateBuildingsTryBuild(int x, int y, uint16_t type)
 
         // Build 3x3 building
 
-        if (type == TYPE_RESIDENTIAL)
-        {
-            building_result = B_ResidentialS3A;
-        }
-        else if (type == TYPE_COMMERCIAL)
-        {
-            building_result = B_CommercialS3A;
-        }
-        else if (type == TYPE_INDUSTRIAL)
-        {
-            building_result = B_IndustrialS3A;
-        }
-        else
-        {
-            UGBA_Assert(0);
-            return;
-        }
-
         size = 3;
 
         goto build_building;
@@ -497,24 +477,6 @@ end3x3:
 
         // Build 2x2 building
 
-        if (type == TYPE_RESIDENTIAL)
-        {
-            building_result = B_ResidentialS2A;
-        }
-        else if (type == TYPE_COMMERCIAL)
-        {
-            building_result = B_CommercialS2A;
-        }
-        else if (type == TYPE_INDUSTRIAL)
-        {
-            building_result = B_IndustrialS2A;
-        }
-        else
-        {
-            UGBA_Assert(0);
-            return;
-        }
-
         size = 2;
 
         goto build_building;
@@ -528,24 +490,6 @@ end2x2:
     {
         // Build 1x1 building
 
-        if (type == TYPE_RESIDENTIAL)
-        {
-            building_result = B_ResidentialS1A;
-        }
-        else if (type == TYPE_COMMERCIAL)
-        {
-            building_result = B_CommercialS1A;
-        }
-        else if (type == TYPE_INDUSTRIAL)
-        {
-            building_result = B_IndustrialS1A;
-        }
-        else
-        {
-            UGBA_Assert(0);
-            return;
-        }
-
         size = 1;
 
         goto build_building;
@@ -557,11 +501,23 @@ end2x2:
 
 build_building:
 
-    // There are 4 versions of all buildings. Pick one randomly.
+    // Translate the current zone type to the semantic command vocabulary.
+    city_rci_kind rci_kind;
+    if (type == TYPE_RESIDENTIAL)
+        rci_kind = CITY_RCI_RESIDENTIAL;
+    else if (type == TYPE_COMMERCIAL)
+        rci_kind = CITY_RCI_COMMERCIAL;
+    else if (type == TYPE_INDUSTRIAL)
+        rci_kind = CITY_RCI_INDUSTRIAL;
+    else
+    {
+        UGBA_Assert(0);
+        return;
+    }
 
-    building_result += rand_slow() & 3;
-
-    MapDrawBuilding(1, building_result, x, y);
+    // Select one of four visual variants for this RCI growth stage.
+    int style_variant = rand_slow() & 3;
+    CityCommand_GrowRCI(rci_kind, size, style_variant, x, y);
 
     for (int j = y; j < (y + size); j++)
     {
@@ -702,7 +658,7 @@ IWRAM_CODE void Simulation_CreateBuildings(void)
 
                 if (demolish_probability > r)
                 {
-                    MapDeleteBuilding(1, i, j); // Forced
+                    CityCommand_Demolish(i, j, 1); // Forced
 
                     // After demolishing the building all the tiles will be RCI,
                     // so it is not needed to clear the demolish request flag.

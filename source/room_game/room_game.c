@@ -7,6 +7,7 @@
 #include <ugba/ugba.h>
 
 #include "audio.h"
+#include "city_model/city_view.h"
 #include "cursor.h"
 #include "date.h"
 #include "input_utils.h"
@@ -234,9 +235,8 @@ static void Load_City_Data(const void *map, int scx, int scy)
 {
     if (map)
     {
-        // Load the map
-        copy_map_to_sbb(map, (void *)CITY_MAP_BASE,
-                        CITY_MAP_HEIGHT, CITY_MAP_WIDTH);
+        // Import the legacy tile map through the city-model boundary.
+        CityView_ImportLegacyMap(map);
     }
 
     mapx = scx * 8;
@@ -1331,8 +1331,14 @@ void Room_Game_City_Save(int slot_index)
     {
         for (int i = 0; i < CITY_MAP_WIDTH; i++)
         {
-            void *map = (void *)CITY_MAP_BASE;
-            uint16_t tile = read_tile_sbb(map, i, j);
+            city_view_cell cell;
+            if (!CityView_ReadCell(i, j, &cell))
+            {
+                UGBA_Assert(0);
+                continue;
+            }
+
+            uint16_t tile = cell.legacy_tile_id;
             city->map_lsb[j * CITY_MAP_WIDTH + i] = tile & 0xFF;
 
             uint16_t msb;
