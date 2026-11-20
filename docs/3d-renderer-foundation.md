@@ -102,6 +102,8 @@ The order below keeps the current game playable while reducing the risk of mixin
 
 ### Phase 4 — Establish desktop rendering and input boundaries
 
+**Progress:** `ucity-3d-prototype` is a separate SDL2/OpenGL desktop executable. It reads a `CityView_CopySnapshot()` and draws a procedural demonstration city without reading GBA VRAM. The first camera supports drag-to-orbit, wheel zoom, and `R` reset. This is a renderer prototype only: it does not yet load saves or run the interactive game loop.
+
 **Tasks**
 
 1. Separate desktop startup, frame update, input, and rendering from the GBA display path; retain shared simulation code.
@@ -185,6 +187,6 @@ The order below keeps the current game playable while reducing the risk of mixin
 
 ## Immediate next work
 
-Phase 0 is complete with the scope decisions above. Phase 1's static dependency and fixture inventory, seven-map controlled simulation baselines, and unresolved footprint findings are recorded in [phase-1-baseline-inventory.md](phase-1-baseline-inventory.md). The baseline comparison is now reproducible; validating selected bridge/network contacts and adding synthetic save import fixtures remain open tasks. Phase 2 has a tile-backed city view, explicit edit commands, and directional network masks, and migrated map access, build, demolition, growth, and network editing through the adapter. An initial Phase 3 slice now stores water animation phase independently and keeps legacy visual tile selection in the drawing adapter. Remaining work includes replacing legacy tile-family interpretation with canonical cell and building state, moving bridge/composite interpretation behind semantic operations, and auditing residual direct tile-ID dependencies. A 3D renderer should consume the view and must not read GBA VRAM directly.
+Phase 0 is complete with the scope decisions above. Phase 1's static dependency and fixture inventory, seven-map controlled simulation baselines, and unresolved footprint findings are recorded in [phase-1-baseline-inventory.md](phase-1-baseline-inventory.md). The baseline comparison is now reproducible; validating selected bridge/network contacts and adding synthetic save import fixtures remain open tasks. Phase 2 has a tile-backed city view, explicit edit commands, directional network masks, and building footprint dimensions, and migrated map access, build, demolition, growth, and network editing through the adapter. An initial Phase 3 slice now stores water animation phase independently and keeps legacy visual tile selection in the drawing adapter. A separate OpenGL city-view prototype now reads the snapshot API and supports orbit and zoom. Remaining work includes replacing legacy tile-family interpretation with canonical cell and building state, connecting the prototype to actual city loading and simulation, adding picking and edit tools, moving bridge/composite interpretation behind semantic operations, and auditing residual direct tile-ID dependencies. The renderer must continue to consume the view without reading GBA VRAM directly.
 
 The roadmap is being implemented incrementally; the existing save format remains unchanged.
