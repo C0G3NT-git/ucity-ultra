@@ -4,18 +4,17 @@
 
 #include <stdlib.h>
 
+#include "city_model/city_view.h"
 #include "random.h"
 #include "room_game/draw_common.h"
-#include "room_game/room_game.h"
-#include "room_game/tileset_info.h"
 
 void Simulation_WaterAnimate(void)
 {
     int count = (rand_fast() & 31) + 1;
 
-    for (int j = 0; j < CITY_MAP_HEIGHT; j++)
+    for (int j = 0; j < CITY_VIEW_HEIGHT; j++)
     {
-        for (int i = 0; i < CITY_MAP_WIDTH; i++)
+        for (int i = 0; i < CITY_VIEW_WIDTH; i++)
         {
             if (count > 0)
             {
@@ -25,11 +24,9 @@ void Simulation_WaterAnimate(void)
 
             count = (rand_fast() & 31) + 1;
 
-            uint16_t tile = CityMapGetTile(i, j);
-            if (tile == T_WATER)
-                CityMapDrawTile(T_WATER_EXTRA, i, j);
-            else if (tile == T_WATER_EXTRA)
-                CityMapDrawTile(T_WATER, i, j);
+            uint8_t phase;
+            if (CityView_AdvanceWaterAnimation(i, j, &phase))
+                CityMapDrawWaterPhase(phase, i, j);
         }
     }
 }

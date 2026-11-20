@@ -15,6 +15,7 @@ void CityMapGetTypeAndTile(int x, int y, uint16_t *tile, uint16_t *type);
 void CityMapGetTypeAndTileUnsafe(int x, int y, uint16_t *tile, uint16_t *type);
 
 void CityMapDrawTile(uint16_t tile, int x, int y);
+void CityMapDrawWaterPhase(uint8_t phase, int x, int y);
 void CityMapToggleHFlip(int x, int y);
 void CityMapToggleVFlip(int x, int y);
 void CityMapDrawTilePreserveFlip(uint16_t tile, int x, int y);

@@ -59,6 +59,8 @@ typedef struct {
     uint8_t road_connections;
     uint8_t rail_connections;
     uint8_t power_connections;
+    // Simulation animation phase, independent of the legacy water art tile.
+    uint8_t water_animation_phase;
 
     // Temporary migration/debug field. New rendering code should use kind and
     // networks; this ID exists to diagnose legacy conversion discrepancies.
@@ -76,6 +78,10 @@ typedef struct {
 // Returns 1 and fills out_cell for an in-bounds cell; returns 0 otherwise.
 // The result is a snapshot of the current active city at call time.
 int CityView_ReadCell(int x, int y, city_view_cell *out_cell);
+
+// Advances water's simulation-owned animation phase for an in-bounds water
+// cell. Returns 0 for invalid coordinates or non-water cells.
+int CityView_AdvanceWaterAnimation(int x, int y, uint8_t *out_phase);
 
 // Copies the complete city in row-major order into caller-owned storage.
 // Returns 1 on success and 0 for a null or undersized output buffer.

@@ -11,6 +11,8 @@
 
 static uint16_t legacy_city_tiles[CITY_VIEW_CELL_COUNT];
 static uint8_t legacy_city_flips[CITY_VIEW_CELL_COUNT];
+static uint8_t water_animation_phases[CITY_VIEW_CELL_COUNT];
+static uint8_t water_animation_enabled[CITY_VIEW_CELL_COUNT];
 
 static uint8_t flip_connections(uint8_t mask, uint8_t flips)
 {
@@ -131,7 +133,18 @@ void CityView_SetLegacyTile(int x, int y, uint16_t tile_id)
         (y < 0) || (y >= CITY_VIEW_HEIGHT))
         return;
 
-    legacy_city_tiles[y * CITY_VIEW_WIDTH + x] = tile_id & 0x3FF;
+    int index = y * CITY_VIEW_WIDTH + x;
+    uint16_t old_tile = legacy_city_tiles[index];
+    uint16_t new_tile = tile_id & 0x3FF;
+    uint16_t old_type = City_Tileset_Entry_Info(old_tile)->element_type & TYPE_MASK;
+    legacy_city_tiles[index] = new_tile;
+
+    water_animation_enabled[index] =
+        (new_tile == T_WATER) || (new_tile == T_WATER_EXTRA);
+    if (!water_animation_enabled[index])
+        water_animation_phases[index] = 0;
+    else if (old_type != TYPE_WATER)
+        water_animation_phases[index] = new_tile == T_WATER_EXTRA;
 }
 
 int CityView_ReadCell(int x, int y, city_view_cell *out_cell)
@@ -157,6 +170,7 @@ int CityView_ReadCell(int x, int y, city_view_cell *out_cell)
     out_cell->road_connections = flip_connections(tile_connections(tile, CITY_VIEW_NETWORK_ROAD), flips);
     out_cell->rail_connections = flip_connections(tile_connections(tile, CITY_VIEW_NETWORK_RAIL), flips);
     out_cell->power_connections = flip_connections(tile_connections(tile, CITY_VIEW_NETWORK_POWER), flips);
+    out_cell->water_animation_phase = water_animation_phases[y * CITY_VIEW_WIDTH + x];
 
     out_cell->legacy_tile_id = tile;
 
@@ -182,6 +196,23 @@ int CityView_ReadCell(int x, int y, city_view_cell *out_cell)
             }
         }
     }
+    return 1;
+}
+
+int CityView_AdvanceWaterAnimation(int x, int y, uint8_t *out_phase)
+{
+    if ((out_phase == 0) || (x < 0) || (x >= CITY_VIEW_WIDTH) ||
+        (y < 0) || (y >= CITY_VIEW_HEIGHT))
+        return 0;
+
+    city_view_cell cell;
+    int index = y * CITY_VIEW_WIDTH + x;
+    if (!CityView_ReadCell(x, y, &cell) ||
+        (cell.kind != CITY_VIEW_WATER) || !water_animation_enabled[index])
+        return 0;
+
+    water_animation_phases[index] ^= 1;
+    *out_phase = water_animation_phases[index];
     return 1;
 }
 
@@ -212,6 +243,9 @@ int CityView_ImportLegacyMap(const uint16_t *legacy_tiles)
     {
         legacy_city_tiles[i] = legacy_tiles[i] & 0x3FF;
         legacy_city_flips[i] = (uint8_t)(((legacy_tiles[i] >> 10) & 3));
+        water_animation_enabled[i] = (legacy_city_tiles[i] == T_WATER) ||
+                                     (legacy_city_tiles[i] == T_WATER_EXTRA);
+        water_animation_phases[i] = legacy_city_tiles[i] == T_WATER_EXTRA;
     }
 
     copy_map_to_sbb(legacy_tiles, (void *)CITY_MAP_BASE,

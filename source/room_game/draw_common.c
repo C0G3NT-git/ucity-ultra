@@ -158,6 +158,11 @@ void CityMapDrawTile(uint16_t tile, int x, int y)
     CityView_SetLegacyFlipFlags(x, y, 0);
 }
 
+void CityMapDrawWaterPhase(uint8_t phase, int x, int y)
+{
+    CityMapDrawTile(phase ? T_WATER_EXTRA : T_WATER, x, y);
+}
+
 void CityMapDrawTilePreserveFlip(uint16_t tile, int x, int y)
 {
     if ((x < 0) || (x >= CITY_MAP_WIDTH) ||
