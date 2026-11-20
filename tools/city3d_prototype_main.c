@@ -9,71 +9,34 @@
 #include <ugba/ugba.h>
 
 #include "city_model/city_view.h"
+#include "maps/city/scenario_0_rock_river_bin.h"
+#include "maps/city/scenario_1_boringtown_bin.h"
+#include "maps/city/scenario_2_portville_bin.h"
+#include "maps/city/scenario_3_newdale_bin.h"
+#include "maps/city/scenario_4_central_bin.h"
+#include "maps/city/scenario_5_futura_bin.h"
 #include "renderer3d/city_renderer.h"
-#include "room_game/tileset_info.h"
 
-static uint16_t demo_map[CITY_VIEW_CELL_COUNT];
+static const char *scenario_names[] = {
+    "Rock River", "Boringtown", "Portville", "Newdale", "Central", "Futura"
+};
+static const uint8_t *scenario_maps[] = {
+    scenario_0_rock_river_bin,
+    scenario_1_boringtown_bin,
+    scenario_2_portville_bin,
+    scenario_3_newdale_bin,
+    scenario_4_central_bin,
+    scenario_5_futura_bin,
+};
 
-static void map_set(int x, int z, uint16_t tile)
+static uint16_t scenario_map[CITY_VIEW_CELL_COUNT];
+
+static void load_scenario(int index)
 {
-    if ((x >= 0) && (x < CITY_VIEW_WIDTH) &&
-        (z >= 0) && (z < CITY_VIEW_HEIGHT))
-        demo_map[z * CITY_VIEW_WIDTH + x] = tile;
-}
-
-static void place_building(int x, int z, uint16_t base_tile,
-                           int width, int height)
-{
-    for (int dz = 0; dz < height; dz++)
-    {
-        for (int dx = 0; dx < width; dx++)
-            map_set(x + dx, z + dz, base_tile + dz * width + dx);
-    }
-}
-
-static void make_demo_city(void)
-{
-    for (int z = 0; z < CITY_VIEW_HEIGHT; z++)
-    {
-        for (int x = 0; x < CITY_VIEW_WIDTH; x++)
-            map_set(x, z, T_GRASS);
-    }
-
-    for (int z = 4; z < 17; z++)
-        for (int x = 3; x < 18; x++)
-            map_set(x, z, T_WATER);
-
-    for (int z = 4; z < 21; z++)
-        for (int x = 44; x < 61; x++)
-            if (((x + z) % 4) != 0)
-                map_set(x, z, T_FOREST);
-
-    for (int x = 8; x <= 56; x++)
-        map_set(x, 34, T_ROAD_LR);
-    for (int z = 10; z <= 54; z++)
-        map_set(31, z, T_ROAD_TB);
-    map_set(31, 34, T_ROAD_TLRB);
-
-    for (int z = 27; z <= 30; z++)
-        for (int x = 16; x <= 19; x++)
-            map_set(x, z, T_RESIDENTIAL);
-    for (int z = 36; z <= 38; z++)
-        for (int x = 15; x <= 17; x++)
-            map_set(x, z, T_COMMERCIAL);
-    for (int z = 28; z <= 30; z++)
-        for (int x = 38; x <= 40; x++)
-            map_set(x, z, T_INDUSTRIAL);
-
-    place_building(23, 25, T_POLICE_DEPT, 3, 3);
-    place_building(35, 39, T_SCHOOL, 3, 2);
-    for (int z = 23; z <= 25; z++)
-        for (int x = 7; x <= 9; x++)
-            map_set(x, z, T_PARK_BIG + (z - 23) * 3 + (x - 7));
-
-    for (int z = 39; z <= 48; z++)
-        map_set(46, z, T_POWER_LINES_TB);
-
-    CityView_ImportLegacyMap(demo_map);
+    const uint8_t *source = scenario_maps[index];
+    for (int i = 0; i < CITY_VIEW_CELL_COUNT; i++)
+        scenario_map[i] = source[i * 2] | ((uint16_t)source[i * 2 + 1] << 8);
+    CityView_ImportLegacyMap(scenario_map);
 }
 
 int main(int argc, char **argv)
@@ -113,7 +76,9 @@ int main(int argc, char **argv)
 
     SDL_GL_SetSwapInterval(1);
     glClearColor(0.69f, 0.80f, 0.86f, 1.0f);
-    make_demo_city();
+    int selected_scenario = 4;
+    load_scenario(selected_scenario);
+    SDL_SetWindowTitle(window, "µCity Advance 3D — Central (1–6: select scenario)");
 
     float yaw = 35.0f;
     float pitch = 50.0f;
@@ -136,6 +101,18 @@ int main(int argc, char **argv)
                 yaw = 35.0f;
                 pitch = 50.0f;
                 distance = 100.0f;
+            }
+            else if ((event.type == SDL_KEYDOWN) &&
+                     (event.key.keysym.sym >= SDLK_1) &&
+                     (event.key.keysym.sym <= SDLK_6))
+            {
+                selected_scenario = event.key.keysym.sym - SDLK_1;
+                load_scenario(selected_scenario);
+                char title[96];
+                snprintf(title, sizeof(title),
+                         "µCity Advance 3D — %s (1–6: select scenario)",
+                         scenario_names[selected_scenario]);
+                SDL_SetWindowTitle(window, title);
             }
             else if ((event.type == SDL_MOUSEBUTTONDOWN) &&
                      (event.button.button == SDL_BUTTON_LEFT))
